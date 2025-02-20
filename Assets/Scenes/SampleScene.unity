@@ -15256,6 +15256,8 @@ GameObject:
   - component: {fileID: 330585547}
   - component: {fileID: 330585549}
   - component: {fileID: 330585548}
+  - component: {fileID: 330585550}
+  - component: {fileID: 330585551}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -15412,6 +15414,33 @@ MonoBehaviour:
   m_MoveSpeed: 10
   m_MoveSpeedIncrement: 2.5
   m_Turbo: 10
+--- !u!114 &330585550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 725f459088f54bc18747d710472d3825, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  resolution: {x: 1280, y: 720}
+  tiles: []
+--- !u!114 &330585551
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d05ddd44e7d4f70a069776a20cd8262, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  depthBuffer: {fileID: 0}
 --- !u!1 &331069847
 GameObject:
   m_ObjectHideFlags: 0
