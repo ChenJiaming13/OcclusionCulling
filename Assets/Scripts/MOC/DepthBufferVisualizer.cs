@@ -19,16 +19,19 @@ namespace MOC
         [ContextMenu("Visualize")]
         private void Visualize()
         {
+            _moc = GetComponent<MaskedOcclusionCulling>();
             CreateDepthBufferIfNeeded();
             UpdateDepthBuffer();
-            SaveTextureAsPNG("Assets/test.png");
+            SaveTextureAsPNG("Assets/Resources/test_bitmask.png");
         }
 
         private void CreateDepthBufferIfNeeded()
         {
-            if (depthBuffer == null || depthBuffer.width != _moc.BufferWidth || depthBuffer.height != _moc.BufferHeight)
+            if (depthBuffer == null ||
+                depthBuffer.width != Constants.ScreenWidth ||
+                depthBuffer.height != Constants.ScreenHeight)
             {
-                depthBuffer = new Texture2D(_moc.BufferWidth, _moc.BufferHeight, TextureFormat.ARGB32, false)
+                depthBuffer = new Texture2D(Constants.ScreenWidth, Constants.ScreenHeight, TextureFormat.ARGB32, false)
                 {
                     filterMode = FilterMode.Point
                 };
@@ -39,25 +42,23 @@ namespace MOC
         {
             for (var i = 0; i < _moc.Tiles.Length; i++)
             {
-                var tileRow = i / _moc.TilesWidth;
-                var tileCol = i % _moc.TilesWidth;
+                var tileRow = i / Constants.NumColsTile;
+                var tileCol = i % Constants.NumColsTile;
                 UpdateTile(tileRow, tileCol, _moc.Tiles[i]);
             }
         }
 
         private void UpdateTile(int tileRow, int tileCol, in Tile tile)
         {
-            for (var subTileRow = 0; subTileRow < Constants.NumRowsSubTileInTile; subTileRow++)
+            // NumRowsSubTile = 1
+            for (var subTileCol = 0; subTileCol < Constants.NumColsSubTile; subTileCol++)
             {
-                for (var subTileCol = 0; subTileCol < Constants.NumColsSubTileInTile; subTileCol++)
-                {
-                    var pixelRowStart = tileRow * Constants.NumRowsSubTileInTile * Constants.SubTileHeight +
-                                        subTileRow * Constants.SubTileHeight;
-                    var pixelColStart = tileCol * Constants.NumColsSubTileInTile * Constants.SubTileWidth +
-                                        subTileCol * Constants.SubTileWidth;
-                    UpdateSubTile(pixelRowStart, pixelColStart, tile.bitmask[subTileRow][subTileCol],
-                        tile.z0[subTileRow][subTileCol], tile.z1[subTileRow][subTileCol]);
-                }
+                var pixelRowStart = tileRow * Constants.TileHeight;
+                var pixelColStart = tileCol * Constants.TileWidth + subTileCol * Constants.SubTileWidth;
+                var bitmask = tile.bitmask[subTileCol];
+                var z0 = tile.z0[subTileCol];
+                var z1 = tile.z1[subTileCol];
+                UpdateSubTile(pixelRowStart, pixelColStart, bitmask, z0, z1);
             }
         }
 
