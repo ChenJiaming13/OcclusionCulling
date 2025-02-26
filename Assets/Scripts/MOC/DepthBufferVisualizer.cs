@@ -9,6 +9,7 @@ namespace MOC
         [SerializeField] private Texture2D depthBuffer;
         [SerializeField] private Color z0Color = Color.black;
         [SerializeField] private Color z1Color = Color.white;
+        [SerializeField] private bool showBitmask;
         private MaskedOcclusionCulling _moc;
 
         private void Start()
@@ -72,7 +73,20 @@ namespace MOC
                     var bitValue = (bitmask >> (31 - idx)) & 1; 
                     var pixelRow = pixelRowStart + row;
                     var pixelCol = pixelColStart + col;
-                    depthBuffer.SetPixel(pixelCol, pixelRow, bitValue == 1 ? z1Color : z0Color);
+
+                    if (showBitmask)
+                    {
+                        depthBuffer.SetPixel(pixelCol, pixelRow, bitValue == 1 ? z1Color : z0Color);
+                    }
+                    else
+                    {
+                        var weightZ0 = z0;
+                        var weightZ1 = z1;
+                        if (Mathf.Approximately(z0, float.MaxValue)) weightZ0 = weightZ1 = 0.0f;
+                        depthBuffer.SetPixel(pixelCol, pixelRow, bitValue == 1
+                            ? new Color(weightZ1, weightZ1, weightZ1, 1.0f)
+                            : new Color(weightZ0, weightZ0, weightZ0, 1.0f));
+                    }
                 }
             }
         }

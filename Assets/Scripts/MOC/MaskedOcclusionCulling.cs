@@ -1,6 +1,8 @@
-﻿using Unity.Mathematics;
+﻿using System.Diagnostics;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Assertions;
+using Debug = UnityEngine.Debug;
 
 namespace MOC
 {
@@ -16,10 +18,14 @@ namespace MOC
         {
             Assert.IsTrue(meshFilters != null && cam);
             InitTiles();
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
             foreach (var meshFilter in meshFilters)
             {
                 RenderMesh(meshFilter);
             }
+            stopwatch.Stop();
+            Debug.Log($"Cost: {stopwatch.ElapsedMilliseconds}ms!");
         }
         
         private void RenderMesh(MeshFilter meshFilter)
@@ -44,13 +50,14 @@ namespace MOC
                 TransformToScreenSpace(ref vtxX, ref vtxY, ref vtxZ, out var iVtxX, out var iVtxY);
                 ComputeBoundingBox(iVtxX, iVtxY,
                     out var bbTileMinX, out var bbTileMinY, out var bbTileMaxX, out var bbTileMaxY);
+                ComputeDepthPlane(vtxX, vtxY, vtxZ, out var zPixelDx, out var zPixelDy);
                 for (var i = 0; i < idxTri - startIdxTri; i++)
                 {
                     var v0 = new int2(iVtxX[0][i], iVtxY[0][i]);
                     var v1 = new int2(iVtxX[1][i], iVtxY[1][i]);
                     var v2 = new int2(iVtxX[2][i], iVtxY[2][i]);
                     var bbRange = new int4(bbTileMinX[i], bbTileMaxX[i], bbTileMinY[i], bbTileMaxY[i]);
-                    RasterizeTriangle(v0, v1, v2, bbRange);
+                    RasterizeTriangle(v0, v1, v2, bbRange, vtxZ[0][i], zPixelDx[i], zPixelDy[i]);
                 }
             }
             Debug.Log($"NumTri: {numTris} DONE!");
@@ -59,6 +66,12 @@ namespace MOC
         private void InitTiles()
         {
             tiles = new Tile[Constants.NumRowsTile * Constants.NumColsTile];
+            for (var i = 0; i < tiles.Length; i++)
+            {
+                tiles[i].bitmask = uint4.zero;
+                tiles[i].z0 = float.MaxValue;
+                tiles[i].z1 = 0.0f;
+            }
         }
         
         private static void GatherTransformClip(Vector3[] vertices, int[] indices, in float4x4 mvpMatrix, ref int idxTri,
@@ -175,27 +188,36 @@ namespace MOC
             return isAllNonNegative || isAllNonPositive;
         }
         
-        private void RasterizeTriangle(int2 v0, int2 v1, int2 v2, int4 bbRange)
+        private void RasterizeTriangle(int2 v0, int2 v1, int2 v2, int4 bbRange, float z0, float zPixelDx, float zPixelDy)
         {
             for (var tileX = bbRange.x; tileX <= bbRange.y; tileX++)
             {
                 for (var tileY = bbRange.z; tileY <= bbRange.w; tileY++)
                 {
-                    UpdateTile(tileX, tileY, v0, v1, v2);
+                    RasterizeTile(tileX, tileY, v0, v1, v2, z0, zPixelDx, zPixelDy);
                 }
             }
         }
 
-        private void UpdateTile(int tileX, int tileY, int2 v0, int2 v1, int2 v2)
+        private void RasterizeTile(int tileX, int tileY, int2 v0, int2 v1, int2 v2, float z0, float zPixelDx, float zPixelDy)
         {
             var startX = tileX * Constants.TileWidth;
             var startY = tileY * Constants.TileHeight;
             var tileIdx = tileY * Constants.NumColsTile + tileX;
+            var bitmask = uint4.zero;
+            var zMax = float4.zero;
             for (var col = 0; col < Constants.NumColsSubTile; col++)
             {
                 var start1 = startX + col * Constants.SubTileWidth;
-                uint subTileBitmask = 0;
-                    
+                
+                // var leftBottom = new int2(start1, startY) * Constants.SubPixelPrecision;
+                // var rightTop = new int2(
+                //     start1 + Constants.SubTileWidth - 1, 
+                //     startY + Constants.SubTileHeight - 1
+                // ) * Constants.SubPixelPrecision;
+                // if (!IsPointInTriangle(leftBottom, v0, v1, v2) && !IsPointInTriangle(rightTop, v0, v1, v2))
+                //     continue;
+                
                 for (var subRow = 0; subRow < Constants.SubTileHeight; subRow++)
                 {
                     for (var subCol = 0; subCol < Constants.SubTileWidth; subCol++)
@@ -205,14 +227,49 @@ namespace MOC
                             start1 + subCol,
                             startY + subRow
                         ) * Constants.SubPixelPrecision;
+                        var z = z0 + zPixelDx * (p.x - v0.x) + zPixelDy * (p.y - v0.y);
+                        zMax[col] = math.max(zMax[col], z);
                         if (IsPointInTriangle(p, v0, v1, v2))
                         {
-                            subTileBitmask |= (uint)(1 << (31 - maskIdx));
+                            bitmask[col] |= (uint)(1 << (31 - maskIdx));
                         }
                     }
                 }
+            }
+            UpdateTile(tileIdx, ref bitmask, ref zMax);
+        }
 
-                tiles[tileIdx].bitmask[col] |= subTileBitmask;
+        private static void ComputeDepthPlane(
+            in float4x3 vtxX, in float4x3 vtxY, in float4x3 vtxZ,
+            out float4 zPixelDx, out float4 zPixelDy
+        )
+        {
+            var x2 = vtxX[2] - vtxX[0];
+            var x1 = vtxX[1] - vtxX[0];
+            var y1 = vtxY[1] - vtxY[0];
+            var y2 = vtxY[2] - vtxY[0];
+            var z1 = vtxZ[1] - vtxZ[0];
+            var z2 = vtxZ[2] - vtxZ[0];
+
+            // 计算分母 d = 1.0f / (x1*y2 - y1*x2)
+            var denominator = (x1 * y2) - (y1 * x2);
+            var d = math.select(math.rcp(denominator), 0.0f, denominator == 0.0f); // 安全除法，避免除零
+
+            zPixelDx = (z1 * y2 - y1 * z2) * d;
+            zPixelDy = (x1 * z2 - z1 * x2) * d;
+        }
+        
+        private void UpdateTile(int tileIdx, ref uint4 bitmask, ref float4 zMax)
+        {
+            tiles[tileIdx].bitmask |= bitmask;
+            tiles[tileIdx].z1 = math.max(tiles[tileIdx].z1, zMax);
+            var flags = tiles[tileIdx].bitmask == uint.MaxValue;
+            for (var i = 0; i < 4; i++)
+            {
+                if (!flags[i]) continue;
+                tiles[tileIdx].z0[i] = tiles[tileIdx].z1[i];
+                tiles[tileIdx].z1[i] = 0.0f;
+                tiles[tileIdx].bitmask[i] = 0u;
             }
         }
     }

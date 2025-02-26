@@ -43,27 +43,6 @@ public class TestSimd : MonoBehaviour
             vtxY[2] = sY;
         }
     }
-
-    [BurstCompile]
-    public static void ComputeDepthPlane(
-        in float4x3 vtxX, in float4x3 vtxY, in float4x3 vtxZ,
-        out float4 zPixelDx, out float4 zPixelDy
-    )
-    {
-        var x2 = vtxX[2] - vtxX[0];
-        var x1 = vtxX[1] - vtxX[0];
-        var y1 = vtxY[1] - vtxY[0];
-        var y2 = vtxY[2] - vtxY[0];
-        var z1 = vtxZ[1] - vtxZ[0];
-        var z2 = vtxZ[2] - vtxZ[0];
-
-        // 计算分母 d = 1.0f / (x1*y2 - y1*x2)
-        var denominator = (x1 * y2) - (y1 * x2);
-        var d = math.select(math.rcp(denominator), 0.0f, denominator == 0.0f); // 安全除法，避免除零
-
-        zPixelDx = (z1 * y2 - y1 * z2) * d;
-        zPixelDy = (x1 * z2 - z1 * x2) * d;
-    }
     
     [BurstCompile]
     private static float3 Barycentric(float2 a, float2 b, float2 c, float2 p)
