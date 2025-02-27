@@ -16,6 +16,7 @@ namespace MOC
         [ContextMenu("RenderMeshes")]
         public void RenderMeshes()
         {
+            meshFilters = FindObjectsByType<MeshFilter>(FindObjectsSortMode.None);
             Assert.IsTrue(meshFilters != null && cam);
             InitTiles();
             var stopwatch = new Stopwatch();
