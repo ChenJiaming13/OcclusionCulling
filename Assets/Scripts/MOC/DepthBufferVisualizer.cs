@@ -82,7 +82,11 @@ namespace MOC
                     {
                         var weightZ0 = z0;
                         var weightZ1 = z1;
-                        if (Mathf.Approximately(z0, float.MaxValue)) weightZ0 = weightZ1 = 0.0f;
+                        // if (Mathf.Approximately(z0, float.MaxValue)) weightZ0 = weightZ1 = 0.0f;
+                        if (weightZ0 > float.MaxValue * 0.5f) weightZ0 = 0.0f;
+                        if (weightZ1 > float.MaxValue * 0.5f) weightZ1 = 0.0f;
+                        // weightZ0 = 1.0f - weightZ0;
+                        // weightZ1 = 1.0f - weightZ1;
                         depthBuffer.SetPixel(pixelCol, pixelRow, bitValue == 1
                             ? new Color(weightZ1, weightZ1, weightZ1, 1.0f)
                             : new Color(weightZ0, weightZ0, weightZ0, 1.0f));
